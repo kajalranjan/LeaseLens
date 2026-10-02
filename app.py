@@ -150,7 +150,7 @@ def sidebar() -> None:
                       type="primary" if ss.page == key else "secondary")
         _, source = data.load_table()
         st.caption(f"{SOURCE_SHORT.get(source, '🧪 Mock data')} · "
-                   f"{'🟢' if model_ok() else '🔴'} {llm.MODEL}")
+                   f"{'🟢' if model_ok() else '🔴'} {llm.current_model()}")
 
 
 # ---------------------------------------------------------------------
@@ -252,7 +252,7 @@ def page_budget() -> None:
             a, b = st.columns(2)
             if a.button("✨ Explain with AI", use_container_width=True):
                 try:
-                    with st.spinner(f"Asking {llm.MODEL}…"):
+                    with st.spinner(f"Asking {llm.current_model()}…"):
                         text = llm.chat(
                             "You are a friendly money coach for a college student renting their first apartment. "
                             "In 3 short sentences, explain their monthly budget in plain English. Use only the "
@@ -307,7 +307,7 @@ def page_lease() -> None:
 
     if scan:
         try:
-            with st.spinner(f"Reading your lease with {llm.MODEL}… (30–90 s on a laptop)"):
+            with st.spinner(f"Reading your lease with {llm.current_model()}… (30–90 s on a laptop)"):
                 ss.cards = lease_scan.scan_lease(ss.lease_text)
                 ss.scanned_text = ss.lease_text
         except llm.LLMUnavailable as e:
@@ -377,7 +377,7 @@ def page_settings() -> None:
     _, source = data.load_table()
     with ui.card():
         st.markdown(f"**Data source:** {SOURCE_LONG.get(source, 'Mock data: add .streamlit/secrets.toml to use Snowflake')}")
-        st.markdown(f"**Model:** `{llm.MODEL}` at `{llm.URL}` — {'online 🟢' if model_ok() else 'offline 🔴'}")
+        st.markdown(f"**Model:** `{llm.current_model()}` at `{llm.URL}` — {'online 🟢' if model_ok() else 'offline 🔴'}")
         st.caption("Change the model with the LEASELENS_MODEL environment variable (e.g. qwen2.5:3b on slower laptops).")
 
 

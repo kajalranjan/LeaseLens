@@ -45,6 +45,38 @@ class LLMUnavailable(RuntimeError):
     pass
 
 
+# Hosted services rename and retire models often. If the configured model isn't available
+# to this key, ask the service which models it offers and use the best open-weight one.
+PREFERRED = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b", "llama-3.3-70b-versatile",
+             "llama-3.1-8b-instant"]
+SKIP_WORDS = ("whisper", "orpheus", "guard", "tts", "embed")
+_resolved_model: dict[str, str] = {}
+
+
+def _available_models() -> list[str]:
+    url = _setting("LEASELENS_LLM_URL").rstrip("/")
+    try:
+        r = requests.get(f"{url}/v1/models", headers=_headers(), timeout=10)
+        r.raise_for_status()
+        return [m["id"] for m in r.json().get("data", []) if m.get("active", True)]
+    except (requests.RequestException, ValueError, KeyError):
+        return []
+
+
+def _pick_model(models: list[str]) -> str | None:
+    for m in PREFERRED:
+        if m in models:
+            return m
+    chat_models = [m for m in models if not any(w in m.lower() for w in SKIP_WORDS)]
+    return chat_models[0] if chat_models else None
+
+
+def current_model() -> str:
+    """The model actually in use (after any automatic fallback)."""
+    configured = _setting("LEASELENS_MODEL")
+    return _resolved_model.get(configured, configured)
+
+
 def is_hosted() -> bool:
     return _setting("LEASELENS_LLM_API") != "ollama"
 
@@ -64,7 +96,24 @@ def is_available() -> bool:
 
 
 def chat(system: str, user: str, json_mode: bool = False, temperature: float = 0.1) -> str:
-    url, model = _setting("LEASELENS_LLM_URL").rstrip("/"), _setting("LEASELENS_MODEL")
+    try:
+        return _chat(current_model(), system, user, json_mode, temperature)
+    except _ModelNotFound:
+        configured = _setting("LEASELENS_MODEL")
+        fallback = _pick_model(_available_models())
+        if not fallback or fallback == current_model():
+            raise LLMUnavailable(f"The model '{configured}' isn't available to this API key, and no other "
+                                 "chat model was found. Check the key's project settings.")
+        _resolved_model[configured] = fallback
+        return _chat(fallback, system, user, json_mode, temperature)
+
+
+class _ModelNotFound(Exception):
+    pass
+
+
+def _chat(model: str, system: str, user: str, json_mode: bool, temperature: float) -> str:
+    url = _setting("LEASELENS_LLM_URL").rstrip("/")
     messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
     try:
         if not is_hosted():
@@ -77,12 +126,20 @@ def chat(system: str, user: str, json_mode: bool = False, temperature: float = 0
             return r.json()["message"]["content"]
 
         body = {"model": model, "temperature": temperature, "messages": messages}
+        if model.startswith("openai/gpt-oss"):
+            body["reasoning_effort"] = "low"   # faster answers from reasoning models
         if json_mode:
             body["response_format"] = {"type": "json_object"}
         r = requests.post(f"{url}/v1/chat/completions", json=body, headers=_headers(), timeout=TIMEOUT)
+        if r.status_code == 400 and ("response_format" in r.text or "reasoning_effort" in r.text):
+            body.pop("response_format", None)      # some models reject JSON mode or reasoning settings;
+            body.pop("reasoning_effort", None)     # chat_json() can still extract the JSON
+            r = requests.post(f"{url}/v1/chat/completions", json=body, headers=_headers(), timeout=TIMEOUT)
         r.raise_for_status()
         return r.json()["choices"][0]["message"]["content"]
     except requests.HTTPError as e:
+        if e.response is not None and e.response.status_code == 404 and "model" in e.response.text:
+            raise _ModelNotFound() from e
         detail = e.response.text[:200] if e.response is not None else ""
         raise LLMUnavailable(f"The AI service returned an error ({e.response.status_code}): {detail}") from e
     except requests.RequestException as e:
