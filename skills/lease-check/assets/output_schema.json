@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LeaseCheckResult",
+  "type": "object",
+  "required": ["clauses"],
+  "properties": {
+    "clauses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["clause_type", "found", "quote", "explanation", "risk_level", "question_to_ask"],
+        "properties": {
+          "clause_type": {
+            "type": "string",
+            "enum": [
+              "security_deposit",
+              "early_termination",
+              "auto_renewal",
+              "utilities",
+              "extra_fees",
+              "roommate_liability",
+              "subletting",
+              "maintenance"
+            ]
+          },
+          "found": { "type": "boolean" },
+          "quote": { "type": "string", "description": "Verbatim, contiguous passage from the lease. Empty when found is false." },
+          "explanation": { "type": "string" },
+          "risk_level": { "type": "string", "enum": ["low", "medium", "high"] },
+          "question_to_ask": { "type": "string" }
+        }
+      }
+    }
+  }
+}

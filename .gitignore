@@ -1,0 +1,10 @@
+# Never commit credentials
+.streamlit/secrets.toml
+.env
+
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+.DS_Store

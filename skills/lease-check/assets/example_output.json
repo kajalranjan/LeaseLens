@@ -1,0 +1,20 @@
+{
+  "clauses": [
+    {
+      "clause_type": "auto_renewal",
+      "found": true,
+      "quote": "This Lease shall automatically renew for an additional twelve (12) month term unless either party delivers written notice of non-renewal at least sixty (60) days prior to the end of the then-current term.",
+      "explanation": "If you don't tell the landlord in writing two months before your lease ends, you're locked into another full year.",
+      "risk_level": "high",
+      "question_to_ask": "Can the renewal be changed to month-to-month, or the notice period shortened to 30 days?"
+    },
+    {
+      "clause_type": "subletting",
+      "found": false,
+      "quote": "",
+      "explanation": "The lease doesn't say whether you can sublet. That matters if you'll be gone for the summer or a semester abroad.",
+      "risk_level": "medium",
+      "question_to_ask": "If I'm away for the summer, can I sublet, and what's the approval process?"
+    }
+  ]
+}
