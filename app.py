@@ -10,7 +10,7 @@ import pandas as pd
 import streamlit as st
 
 from leaselens import budget as bud
-from leaselens import data, lease_scan, llm, ui
+from leaselens import auth, data, lease_scan, llm, ui
 
 ROOT = Path(__file__).resolve().parent
 SAMPLE_LEASE = (ROOT / "data" / "sample_lease.txt").read_text(encoding="utf-8")
@@ -24,7 +24,7 @@ ui.inject_css()
 ui.reset_cards()
 
 ss = st.session_state
-for k, v in {"page": "landing", "user": None, "zip": "85281", "rent": 1950, "bedrooms": 2,
+for k, v in {"page": "landing", "user": None, "session": None, "zip": "85281", "rent": 1950, "bedrooms": 2,
              "job": 1200, "aid": 500, "parents": 300, "other_exp": 585, "people": 2,
              "utilities": 150, "fees": 0, "deposit": 1950, "reports": [], "lease_text": ""}.items():
     ss.setdefault(k, v)
@@ -45,9 +45,22 @@ def model_ok() -> bool:
 
 
 def save_report(kind: str, summary: str, payload: dict) -> None:
+    if ss.session:                      # real account: store in Supabase
+        try:
+            auth.add_report(ss.session["token"], kind, summary, payload)
+            st.toast("Saved to your account ✅")
+        except auth.AuthError as e:
+            st.error(str(e))
+        return
     ss.reports.insert(0, {"kind": kind, "summary": summary, "when": datetime.now().strftime("%b %d, %I:%M %p"),
                           "data": payload})
     st.toast("Saved to your reports ✅")
+
+
+def start_session(session: dict) -> None:
+    ss.session = session
+    ss.user = session["email"].split("@")[0].title() or "Student"
+    go("rent")
 
 
 # =====================================================================
@@ -96,6 +109,63 @@ def landing() -> None:
                         + "".join(f"<li>{b}</li>" for b in bullets) + "</ul>", unsafe_allow_html=True)
 
 
+def demo_login_form() -> None:
+    st.markdown('<p class="ll-h">Welcome back</p><p class="ll-sub">Log in to save your searches, budgets, '
+                'and lease checks.</p>', unsafe_allow_html=True)
+    with st.form("login", border=False):
+        email = st.text_input("Email address", placeholder="you@school.edu")
+        st.text_input("Password", type="password")
+        if st.form_submit_button("Log In", type="primary", use_container_width=True):
+            if "@" not in email:
+                st.error("Enter an email address.")
+            else:
+                ss.user = email.split("@")[0].title()
+                go("rent")
+                st.rerun()
+    if st.button("Continue as guest", use_container_width=True):
+        ss.user = "Guest"
+        go("rent")
+        st.rerun()
+    st.caption("Demo sign-in: saved reports live only in this browser session.")
+
+
+def account_forms() -> None:
+    st.markdown('<p class="ll-h">Welcome</p><p class="ll-sub">Log in or create a free account to save your '
+                'rent checks, budgets, and lease scans.</p>', unsafe_allow_html=True)
+    tab_in, tab_up = st.tabs(["Log in", "Create account"])
+    with tab_in:
+        with st.form("login", border=False):
+            email = st.text_input("Email address", placeholder="you@school.edu")
+            pw = st.text_input("Password", type="password")
+            if st.form_submit_button("Log In", type="primary", use_container_width=True):
+                try:
+                    start_session(auth.sign_in(email.strip(), pw))
+                    st.rerun()
+                except auth.AuthError as e:
+                    st.error(str(e))
+    with tab_up:
+        with st.form("signup", border=False):
+            email = st.text_input("Email address", placeholder="you@school.edu", key="su_email")
+            pw = st.text_input("Password (at least 6 characters)", type="password", key="su_pw")
+            if st.form_submit_button("Create account", type="primary", use_container_width=True):
+                if "@" not in email or len(pw) < 6:
+                    st.error("Enter an email and a password of at least 6 characters.")
+                else:
+                    try:
+                        session = auth.sign_up(email.strip(), pw)
+                        if session:
+                            start_session(session)
+                            st.rerun()
+                        st.success("Account created! Check your email to confirm it, then log in.")
+                    except auth.AuthError as e:
+                        st.error(str(e))
+    if st.button("Continue as guest", use_container_width=True):
+        ss.user = "Guest"
+        go("rent")
+        st.rerun()
+    st.caption("Guests can use everything; saved reports last only for this visit.")
+
+
 def login() -> None:
     art, form = st.columns([6, 5], gap="large")
     with art:
@@ -106,26 +176,10 @@ def login() -> None:
     with form:
         st.write("")
         with ui.card():
-            st.markdown('<p class="ll-h">Welcome back</p><p class="ll-sub">Log in to save your searches, budgets, '
-                        'and lease checks.</p>', unsafe_allow_html=True)
-            with st.form("login", border=False):
-                email = st.text_input("Email address", placeholder="you@school.edu")
-                st.text_input("Password", type="password")
-                if st.form_submit_button("Log In", type="primary", use_container_width=True):
-                    if "@" not in email:
-                        st.error("Enter an email address.")
-                    else:
-                        ss.user = email.split("@")[0].title()
-                        go("rent")
-                        st.rerun()
-            st.markdown('<p style="text-align:center;color:#9CA3AF;font-size:.8rem">— or continue with —</p>',
-                        unsafe_allow_html=True)
-            for provider in ("Google", "GitHub"):
-                if st.button(f"Continue with {provider}", use_container_width=True):
-                    ss.user = "Guest"
-                    go("rent")
-                    st.rerun()
-            st.caption("Demo sign-in: accounts and saved reports live only in this browser session.")
+            if auth.enabled():
+                account_forms()
+            else:
+                demo_login_form()
         st.button("← Back", on_click=go, args=("landing",))
 
 
@@ -350,11 +404,24 @@ def page_lease() -> None:
 
 # ---------------------------------------------------------------------
 def page_saved() -> None:
-    st.markdown('<p class="ll-h">Saved Reports</p><p class="ll-sub">Saved for this session. Download anything you '
-                'want to keep.</p>', unsafe_allow_html=True)
-    if not ss.reports:
+    if ss.session:
+        st.markdown('<p class="ll-h">Saved Reports</p><p class="ll-sub">Saved to your account. They\'ll be here '
+                    'next time you log in.</p>', unsafe_allow_html=True)
+        try:
+            rows = auth.list_reports(ss.session["token"])
+        except auth.AuthError as e:
+            st.error(str(e))
+            rows = []
+        reports = [{"kind": r["kind"], "summary": r["summary"], "data": r["data"],
+                    "when": datetime.fromisoformat(r["created_at"].replace("Z", "+00:00")).strftime("%b %d, %I:%M %p")}
+                   for r in rows]
+    else:
+        st.markdown('<p class="ll-h">Saved Reports</p><p class="ll-sub">Saved for this visit. Download anything you '
+                    'want to keep.</p>', unsafe_allow_html=True)
+        reports = ss.reports
+    if not reports:
         st.info("Nothing saved yet. Use the 💾 buttons on each screen.")
-    for i, r in enumerate(ss.reports):
+    for i, r in enumerate(reports):
         with ui.card():
             a, b = st.columns([4, 1])
             a.markdown(f"**{r['kind']}** · {r['summary']}  \n<span class='ll-sub'>{r['when']}</span>",
@@ -364,10 +431,15 @@ def page_saved() -> None:
 
 
 def page_profile() -> None:
-    st.markdown(f'<p class="ll-h">Profile</p><p class="ll-sub">Signed in as {html.escape(ss.user or "Guest")} '
-                '(demo session).</p>', unsafe_allow_html=True)
+    if ss.session:
+        who = f"Signed in as {html.escape(ss.session['email'])}."
+    else:
+        who = f"Signed in as {html.escape(ss.user or 'Guest')} (this visit only)."
+    st.markdown(f'<p class="ll-h">Profile</p><p class="ll-sub">{who}</p>', unsafe_allow_html=True)
     if st.button("Log out"):
         ss.user = None
+        ss.session = None
+        ss.reports = []
         go("landing")
         st.rerun()
 
