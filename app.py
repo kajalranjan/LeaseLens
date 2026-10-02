@@ -75,7 +75,7 @@ def landing() -> None:
         st.markdown(ui.hero_illustration(), unsafe_allow_html=True)
 
     st.write("")
-    cols = st.columns(4, gap="medium")
+    cols = st.columns(3, gap="medium")
     features = [
         ("📍", "1. Rent Check", "Compare your rent to the area.",
          ["Enter a zip code, rent, and bedrooms", "See how your rent compares to the area median",
@@ -89,19 +89,11 @@ def landing() -> None:
           "Shows exact quotes, explanations, and questions to ask", "Every quote is verified against your text",
           "Not legal advice"]),
     ]
-    for col, (icon, title, sub, bullets) in zip(cols[:3], features):
+    for col, (icon, title, sub, bullets) in zip(cols, features):
         with ui.card(col):
             st.markdown(f'<div style="font-size:1.6rem">{icon}</div><p class="ll-h" style="font-size:1.05rem">{title}</p>'
                         f'<p class="ll-sub">{sub}</p><ul class="ll-feature">'
                         + "".join(f"<li>{b}</li>" for b in bullets) + "</ul>", unsafe_allow_html=True)
-    with ui.card(cols[3]):
-        st.markdown('<p class="ll-h" style="font-size:1.05rem">Built for students<br>by students</p><ul class="ll-feature" '
-                    'style="list-style:none;padding-left:0">'
-                    "<li>🏛️ Real data from the U.S. Census (ACS) via Snowflake</li>"
-                    "<li>🧠 Open-weight AI (runs locally with Ollama)</li>"
-                    "<li>⏱️ Simple, clear answers in about a minute</li>"
-                    "<li>⬇️ Export your results</li>"
-                    "<li>💜 MIT licensed and open source</li></ul>", unsafe_allow_html=True)
 
 
 def login() -> None:
@@ -258,7 +250,7 @@ def page_budget() -> None:
                         unsafe_allow_html=True)
             st.write("")
             a, b = st.columns(2)
-            if a.button("✨ Explain with local AI", use_container_width=True):
+            if a.button("✨ Explain with AI", use_container_width=True):
                 try:
                     with st.spinner(f"Asking {llm.MODEL}…"):
                         text = llm.chat(
@@ -270,7 +262,7 @@ def page_budget() -> None:
                     ss.setdefault("ai_summary", {})[key] = text.strip()
                     st.rerun()
                 except llm.LLMUnavailable:
-                    st.error("The local model isn't running, so you're seeing the template summary.")
+                    st.error("The AI model isn't reachable right now, so you're seeing the standard summary.")
             if b.button("💾 Save budget", use_container_width=True):
                 save_report("Budget check", f"${res.left_over:,.0f}/mo left · housing {res.housing_pct:.0f}% of income",
                             res.to_dict())
@@ -319,7 +311,7 @@ def page_lease() -> None:
                 ss.cards = lease_scan.scan_lease(ss.lease_text)
                 ss.scanned_text = ss.lease_text
         except llm.LLMUnavailable as e:
-            st.error(f"The local model isn't running. Start Ollama and try again. ({e})")
+            st.error(f"The AI model isn't reachable right now. Please try again in a moment. ({e})")
         except ValueError as e:
             st.error(f"The model's answer wasn't valid JSON. Try again. ({e})")
 

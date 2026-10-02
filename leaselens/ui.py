@@ -22,7 +22,8 @@ CSS = f"""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 html, body, [class*="css"], .stMarkdown, .stButton button, input, textarea, label {{ font-family: 'Inter', sans-serif !important; }}
-#MainMenu, footer, header [data-testid="stToolbar"] {{ visibility: hidden; }}
+#MainMenu, footer, [data-testid="stAppDeployButton"] {{ visibility: hidden; }}
+header[data-testid="stHeader"] {{ background: transparent; }}
 .block-container {{ padding-top: 1.6rem; max-width: 1180px; }}
 
 /* sidebar */
@@ -51,12 +52,18 @@ div[data-testid="stExpander"] details {{ border-radius: 12px; border-color: #E6E
   background:#EEF0FF; color:{INDIGO}; font-weight:700; font-size:.85rem; margin-right:.5rem; }}
 .ll-pill {{ display:inline-block; padding:2px 10px; border-radius:999px; font-size:.75rem; font-weight:600; }}
 .ll-big {{ font-size: 1.55rem; font-weight: 800; line-height: 1.25; color:#1F2340; }}
-.ll-row {{ display:flex; align-items:center; justify-content:space-between; padding:.6rem 0; border-bottom:1px solid #F0F1F5; font-size:.9rem; }}
+.ll-row {{ display:grid; grid-template-columns: minmax(0,1fr) 64px 72px 104px; gap:.5rem; align-items:center; padding:.6rem 0; border-bottom:1px solid #F0F1F5; font-size:.9rem; }}
 .ll-row:last-child {{ border-bottom:none; }}
+.ll-row > :nth-child(2), .ll-row > :nth-child(3) {{ text-align:right; }}
+.ll-row > :last-child {{ justify-self:end; }}
 .ll-quote {{ background:#F7F7FB; border-left:3px solid {INDIGO}; padding:.65rem .8rem; border-radius:8px; font-size:.88rem; color:#374151; }}
 .ll-ask {{ background:#EEF0FF; border-radius:10px; padding:.65rem .8rem; font-size:.88rem; }}
 .ll-hero {{ background: linear-gradient(135deg,#EEF0FF 0%,#F8F5FF 55%,#FFF7EE 100%); border-radius: 20px; padding: 2.2rem; }}
-.ll-feature li {{ margin: .3rem 0; font-size: .9rem; color:#374151; }}
+ul.ll-feature {{ list-style: none !important; padding-left: 0 !important; margin: .2rem 0 0 !important; }}
+ul.ll-feature li {{ display: flex; align-items: flex-start; gap: .6rem; margin: .45rem 0 !important;
+  padding-left: 0 !important; font-size: .9rem; line-height: 1.45; color: #374151; }}
+ul.ll-feature li::before {{ content: ""; flex: 0 0 6px; height: 6px; margin-top: .55em; border-radius: 50%;
+  background: {INDIGO}; }}
 .ll-meaning {{ background:#F4F5FF; border-radius:12px; padding:.9rem 1rem; font-size:.9rem; color:#374151; }}
 mark.ll {{ padding: 0 2px; border-radius: 3px; }}
 </style>
